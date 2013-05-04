@@ -67,7 +67,16 @@
       <i><%$CustomField->FriendlyType%></i>
     </td>
 %    if ($CustomField->CurrentUserHasRight("ModifyCustomField")) {
-    <td class="entry"><& /AssetTracker/Elements/EditCustomField, Object => $AssetObj, CustomField => $CustomField, NamePrefix => $NamePrefix &>
+    <td class="entry">
+% my $default = $m->notes('Field-' . $CustomField->Id);
+% $default ||= $ARGS{"CustomField-". $CustomField->Id };
+      <& /Elements/EditCustomField, 
+          %ARGS,
+          Object => $AssetObj,
+          CustomField => $CustomField,
+          NamePrefix => $NamePrefix,
+          Default => $default,
+      &>
 %    }
 %    elsif ($CustomField->CurrentUserHasRight("SeeCustomField")) {
 %        my $Values = $Object->CustomFieldValues($CustomField->Id);

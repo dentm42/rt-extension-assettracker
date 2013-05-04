@@ -44,14 +44,17 @@
 %# 
 %# END BPS TAGGED BLOCK }}}
 <& /Elements/Header, 
-    Title => $AssetObj->Name &>
+    Title => $title &>
 <& /AssetTracker/Elements/Tabs, 
     Asset => $AssetObj, 
     current_tab => 'Asset/Display.html?id='.$AssetObj->id,
-    Title => $AssetObj->Name &>
+    Title => $title &>
+
+% $m->callback(CallbackName => 'BeforeActionList', %ARGS, Actions => \@Actions, ARGSRef => \%ARGS, Asset => $AssetObj);
 
 <& /Elements/ListActions, actions => \@Actions &>
 
+% $m->callback( %ARGS, Asset => $AssetObj, CallbackName => 'BeforeShowSummary' );
 <div class="summary">
 <&| /Widgets/TitleBox, title => loc('Asset metadata') &>
 <& /AssetTracker/Asset/Elements/ShowSummary,  Asset => $AssetObj &>
@@ -59,18 +62,21 @@
 </div>
 <br />
 
+% $m->callback( Asset => $AssetObj, %ARGS, CallbackName => 'BeforeShowHistory' );
+
 % if ( $RT::ShowAssetHistory ) {
-<& /AssetTracker/Asset/Elements/ShowHistory , 
-      Asset => $AssetObj, 
-      Assets => $Assets, 
-      Collapsed => $ARGS{'Collapsed'}, 
-      ShowHeaders => $ARGS{'ShowHeaders'},
-      MaxRows => $RT::ShowAssetHistory,
-      Attachments => $attachments,
-      AttachmentContent => $attachment_content
+<& /Ticket/Elements/ShowHistory , 
+      Ticket => $AssetObj, 
+      Tickets => $Assets, 
+      ShowDisplayModes => 0,
+      DisplayPath => RT->Config->Get('WebPath')."/AssetTracker/Asset/Display.html?id=".$AssetObj->id
       &> 
 % }
 
+% $m->callback( %ARGS,
+%     Asset        => $AssetObj,
+%     CallbackName => 'AfterShowHistory',
+% );
   
 <%ARGS>
 $id => undef
@@ -83,9 +89,9 @@ $Actions => undef
 
 <%INIT>
 
-$m->comp('/Elements/Callback', _CallbackName => 'Initial', AssetObj => $AssetObj, ARGSRef => \%ARGS);
+$m->callback( AssetObj => $AssetObj, ARGSRef => \%ARGS, CallbackName => 'Initial' );
 
-my ($linkid, $message, @Actions, $tid, $Assets);  
+my ($linkid, $message, @Actions, $tid, $Assets, $title);
 push(@Actions, @$Actions) if $Actions;
 
 unless ($id || $AssetObj) {
@@ -104,8 +110,7 @@ if ($ARGS{'id'} eq 'new') {
 	Abort('You have no permission to create assets of that type.');
     }
     ($AssetObj, @Actions) =
-	CreateAsset(Attachments => $session{'Attachments'}, %ARGS);
-    delete $session{'Attachments'};
+	CreateAsset(%ARGS);
     unless ($AssetObj->CurrentUserHasRight('ShowAsset')) {
 	Abort("No permission to view newly created asset #".$AssetObj->id.".");
 	}
@@ -121,6 +126,10 @@ if ($ARGS{'id'} eq 'new') {
 	}
     }
 
+    $m->callback( CallbackName => 'BeforeProcessArguments',
+        AssetObj => $AssetObj, Assets => $Assets,
+        ActionsRef => \@Actions, ARGSRef => \%ARGS );
+
     #if (defined $ARGS{'Action'}) {
 	#if ($ARGS{'Action'} =~ /^(Steal|Kill|Take|SetTold)$/) {
 	    #my $action = $1;
@@ -129,17 +138,19 @@ if ($ARGS{'id'} eq 'new') {
 	#}
     #}
 
+    $m->callback(CallbackName => 'ProcessArguments',
+        Asset => $AssetObj,
+        ARGSRef => \%ARGS,
+        Actions => \@Actions);
+        
     #$ARGS{'UpdateContent'} =~ s/\r\n/\n/g;
     #if ( $ARGS{'UpdateTimeWorked'} ||
-	 #$session{'Attachments'} || 
 	 #(   $ARGS{'UpdateContent'} ne ''
 	     #&& $ARGS{'UpdateContent'} ne "-- \n"
 	     #. $session{'CurrentUser'}->UserObj->Signature )) {
-	#$ARGS{UpdateAttachments} = $session{'Attachments'};
 	#ProcessUpdateMessage( ARGSRef   => \%ARGS,
 			      #Actions   => \@Actions,
 			      #AssetObj => $AssetObj );
-	#delete $session{'Attachments'};
     #}
     #Process status updates
     my @BasicActions = ProcessAssetBasics(ARGSRef => \%ARGS, AssetObj=>$AssetObj);
@@ -149,12 +160,25 @@ if ($ARGS{'id'} eq 'new') {
 }
 
 
+$title = $AssetObj->Name;
 
-$m->comp('/Elements/Callback', _CallbackName => 'BeforeDisplay',
-	 AssetObj => \$AssetObj, Assets => \$Assets, ARGSRef => \%ARGS);
+$m->callback(
+    CallbackName => 'BeforeDisplay',
+    AssetObj => \$AssetObj,
+    Assets => \$Assets,
+    Actions => \@Actions,
+    title => \$title,
+    ARGSRef => \%ARGS,
+);
 
-
-my $attachments = $m->comp('Elements/FindAttachments', Asset => $AssetObj, Assets => $Assets);
-my $attachment_content = $m->comp('Elements/LoadTextAttachments', Asset => $AssetObj);
+# This code does automatic redirection if any updates happen. 
+if ($RT::VERSION =~ /^4/) {
+  MaybeRedirectForResults(
+    Actions   => \@Actions,
+    Path      => "/AssetTracker/Asset/Display.html",
+    Anchor    => $ARGS{'Anchor'},
+    Arguments => { id => $AssetObj->id },
+  );
+}
 
 </%INIT>
