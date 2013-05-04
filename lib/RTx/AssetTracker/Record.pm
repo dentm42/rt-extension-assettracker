@@ -219,8 +219,8 @@ sub _NewTransaction {
 	$new_ref = $new_ref->Id if ref($new_ref);
     }
 
-    require RTx::AssetTracker::Transaction;
-    my $trans = new RTx::AssetTracker::Transaction( $self->CurrentUser );
+    require RT::Transaction;
+    my $trans = new RT::Transaction( $self->CurrentUser );
     my ( $transaction, $msg ) = $trans->Create(
 	ObjectId  => $self->Id,
 	ObjectType => ref($self),
@@ -267,8 +267,8 @@ sub _NewTransaction {
 sub Transactions {
     my $self = shift;
 
-    use RTx::AssetTracker::Transactions;
-    my $transactions = RTx::AssetTracker::Transactions->new( $self->CurrentUser );
+    use RT::Transactions;
+    my $transactions = RT::Transactions->new( $self->CurrentUser );
 
     #If the user has no rights, return an empty object
     $transactions->Limit(
@@ -707,9 +707,6 @@ sub UnresolvedDependencies {
 
 # }}}
 
-eval "require RTx::AssetTracker::Record_Vendor";
-die $@ if ($@ && $@ !~ qr{^Can't locate RTx/AssetTracker/Record_Vendor.pm});
-eval "require RTx::AssetTracker::Record_Local";
-die $@ if ($@ && $@ !~ qr{^Can't locate RTx/AssetTracker/Record_Local.pm});
+RT::Base->_ImportOverlays();
 
 1;

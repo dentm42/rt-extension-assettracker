@@ -2,7 +2,7 @@
 %# 
 %# COPYRIGHT:
 %#  
-%# This software is Copyright (c) 1996-2004 Best Practical Solutions, LLC 
+%# This software is Copyright (c) 1996-2005 Best Practical Solutions, LLC 
 %#                                          <jesse@bestpractical.com>
 %# 
 %# (Except where explicitly superseded by other copyright notices)
@@ -43,51 +43,18 @@
 %# those contributions and any derivatives thereof.
 %# 
 %# END BPS TAGGED BLOCK }}}
-<%INIT>
-my %documents;
-
-#A default implementation here loops through all transactions and pulls out all their attachments.
-# We end up doing an end-run around that to get a bit more performance
-
-# We force the cache of asset transactions to get populated up front. otherwise, the 
-# code that looks at attachments will look at each one in turn.
-my $attachments = RT::Attachments->new( $session{'CurrentUser'} );
-
-$attachments->Columns( qw( Id Filename ContentType Headers Subject Parent ContentEncoding ContentType TransactionId Created));
-
-my $transactions = $attachments->NewAlias('Transactions');
-$attachments->Join( ALIAS1 => 'main',
-		    FIELD1 => 'TransactionId',
-		    ALIAS2 => $transactions,
-		    FIELD2 => 'id' );
-    
-my $assets = $attachments->NewAlias('AT_Assets');
-
-  $attachments->Join( ALIAS1 => $transactions,                         
-                        FIELD1 => 'ObjectId',
-                        ALIAS2 => $assets,
-                        FIELD2 => 'id' );
-    
-    $attachments->Limit( ALIAS => $transactions,
-                         FIELD => 'ObjectType',
-                        VALUE => 'RTx::AssetTracker::Asset');
-if ($Assets) {
-    while ($Asset = $Assets->Next) {
-	$attachments->Limit( ALIAS => $assets,
-			     FIELD => 'Id',
-			     VALUE => $Asset->id() );
-    }
-} else {
-    $attachments->Limit( ALIAS => $assets,
-			 FIELD => 'Id',
-			 VALUE => $Asset->id() );
-}
-
-
-return ($attachments);
-</%INIT>
+%# REST/1.0/Forms/asset/ns
+%#
 <%ARGS>
-$Asset => undef
-$Assets => undef
+$id
 </%ARGS>
+<%perl>
 
+my $asset = new RTx::AssetTracker::Asset $session{CurrentUser};
+# Actually, $id here isn't an ID, it's an Asset Name
+$asset->Load($id); 
+if (!$asset->Id) {
+        return (0, "No Asset of name \"$id\" exists.");
+    }
+return $asset->Id;
+</%perl>

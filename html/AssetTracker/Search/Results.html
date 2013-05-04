@@ -52,7 +52,8 @@
     Rows => $Rows,
     OrderBy => $OrderBy,
     Order => $Order &>
-<& /AssetTracker/Elements/AssetList, 
+<& /Elements/CollectionList, 
+    Collection => $session{'assets'},
     Query => $Query,
     AllowSorting => 1,
     OrderBy => $OrderBy,
@@ -60,6 +61,7 @@
     Rows => $Rows,
     Page => $Page,
     Format => $Format,
+    Class => 'RTx::AssetTracker::Assets',
     BaseURL => $RT::WebPath."/AssetTracker/Search/Results.html?"
 
    &>
@@ -84,19 +86,32 @@
 <a href="<%$RT::WebPath%>/AssetTracker/Search/Export.html<%$QueryString%>"><&|/l&>Importable Spreadsheet</&></a><br>
 <a href="<%$RT::WebPath%>/AssetTracker/Search/Results.rdf<%$QueryString%>"><&|/l&>RSS Feed</&></a>
 %# | <a href="<%$RT::WebPath%>/AssetTracker/Tools/Offline.html<%$QueryString%>"><&|/l&>Work offline</&></a><br>
-<& /Elements/Callback, _CallbackName => 'SearchActions', QueryString => $QueryString&>
+% $m->callback( QueryString => $QueryString, CallbackName => 'SearchActions' );
 </div>
 <%INIT>
+
+$Page = 1 unless $Page && $Page > 0;
+
 my ($title, $assetcount);
 $session{'i'}++;
 $session{'assets'} = RTx::AssetTracker::Assets->new($session{'CurrentUser'}) ;
 $session{'assets'}->FromSQL($Query) if ($Query);
-$session{'assets'}->OrderBy(FIELD => $OrderBy, ORDER => $Order); 
+if ($OrderBy =~ /\|/) {
+    # Multiple Sorts
+    my @OrderBy = split /\|/,$OrderBy;
+    my @Order = split /\|/,$Order;
+    $session{'assets'}->OrderByCols(
+        map { { FIELD => $OrderBy[$_], ORDER => $Order[$_] } } ( 0
+        .. $#OrderBy ) );; 
+} else {
+    $session{'assets'}->OrderBy(FIELD => $OrderBy, ORDER => $Order); 
+}
 
 
 $session{'CurrentAssetSearchHash'} = {
     Format      => $Format,
     Query       => $Query,
+    Page        => $Page,
     Order       => $Order,
     OrderBy     => $OrderBy,
     RowsPerPage => $Rows,
@@ -108,8 +123,8 @@ $session{'CurrentAssetSearchHash'} = {
 if ( $session{'assets'}->Query()) {
     $assetcount = $session{assets}->CountAll();
     if ($assetcount == 1 and $AutoForwardSingleResult) {
-        $m->comp('/AssetTracker/Asset/Display.html', id => $session{'assets'}->First->Id);
-        return;
+        RT::Interface::Web::Redirect( RT->Config->Get('WebURL')
+            ."AssetTracker/Asset/Display.html?id=". $session{assets}->First->id );
     }
     $title = loc('Found [quant,_1,asset]', $assetcount);
 } else {

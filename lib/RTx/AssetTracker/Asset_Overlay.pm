@@ -1208,6 +1208,17 @@ sub CurrentUserHasRight {
 
 # }}}
 
+=head2 CurrentUserCanSee
+
+Returns true if the current user can see the ticket, using ShowTicket
+
+=cut
+
+sub CurrentUserCanSee {
+    my $self = shift;
+    return $self->CurrentUserHasRight('ShowTicket');
+}
+
 # {{{ sub HasRight
 
 =head2 HasRight
@@ -1580,6 +1591,10 @@ sub AddIP {
         return ( 0, $self->loc("Retired assets cannot have IP addresses") );
     }
 
+    if ( $self->Status eq 'deleted') {
+        return ( 0, $self->loc("Deleted assets cannot have IP addresses") );
+    }
+
     unless ($args{IP} or $args{Interface}) {
         return ( 0, $self->loc("IP address or interface must be specified") );
     }
@@ -1685,11 +1700,20 @@ sub SetStatus {
     $args{Status} = $args{Status} || $args{Value};
 
     #Check ACL
-    if ( $args{Status} eq 'retired') {
+    if ( $args{Status} eq 'deleted') {
+            unless ($self->CurrentUserHasRight('DeleteAsset')) {
+            return ( 0, $self->loc('Permission Denied') );
+       }
+        # We don't want deleted assets to have IP addresses
+        my $ips = $self->IPs();
+        while (my $ip = $ips->Next) {
+            my($a, $b) = $self->DeleteIP( IP => $ip->IP );
+        }
+    } elsif ( $args{Status} eq 'retired') {
             unless ($self->CurrentUserHasRight('RetireAsset')) {
             return ( 0, $self->loc('Permission Denied') );
        }
-        # We don't want reired assets to have IP addresses
+        # We don't want retired assets to have IP addresses
         my $ips = $self->IPs();
         while (my $ip = $ips->Next) {
             my($a, $b) = $self->DeleteIP( IP => $ip->IP );
